@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Medical Assistant — Symptom Checker, Medicines & Reminders</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --teal:#0ea5e9;
+  --teal-dark:#0284c7;
+  --purple:#8b5cf6;
+  --purple-dark:#7c3aed;
+  --pink:#ec4899;
+  --green:#10b981;
+  --orange:#f59e0b;
+  --red:#ef4444;
+  --bg:#0f172a;
+  --card:#1e293b;
+  --card2:#263248;
+  --border:#334155;
+  --text:#f1f5f9;
+  --muted:#94a3b8;
+  --radius:16px;
+}
+
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ── HEADER ── */
+header{
+  background:linear-gradient(135deg,#1e3a5f 0%,#1a1a4e 50%,#2d1b4e 100%);
+  padding:18px 28px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(139,92,246,.3);
+  box-shadow:0 4px 24px rgba(0,0,0,.4);
+  position:sticky;top:0;z-index:100;
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--teal),var(--purple));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 20px rgba(14,165,233,.4)}
+.logo h1{font-size:1.35rem;font-weight:800;background:linear-gradient(90deg,var(--teal),var(--purple),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo .sub{font-size:.72rem;color:var(--muted);margin-top:2px}
+.topbar{display:flex;align-items:center;gap:10px}
+
+/* ── NAV TABS ── */
+.nav-tabs{display:flex;gap:4px;background:rgba(255,255,255,.05);border-radius:12px;padding:4px;margin:0 28px;overflow-x:auto}
+.nav-tab{padding:8px 18px;border-radius:9px;border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:.85rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:.2s}
+.nav-tab:hover{color:var(--text);background:rgba(255,255,255,.08)}
+.nav-tab.active{background:linear-gradient(135deg,var(--teal),var(--purple));color:#fff;box-shadow:0 2px 12px rgba(14,165,233,.3)}
+
+/* ── LAYOUT ── */
+.main-wrap{display:grid;grid-template-columns:1fr 340px;gap:20px;padding:24px 28px;max-width:1400px;margin:0 auto}
+@media(max-width:900px){.main-wrap{grid-template-columns:1fr}}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:18px}
+.card-title{font-size:1rem;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.card-title .icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.card-sub{font-size:.78rem;color:var(--muted);margin-bottom:14px}
+
+/* ── BUTTONS ── */
+.btn{padding:9px 18px;border-radius:10px;border:none;font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:linear-gradient(135deg,var(--teal),var(--purple));color:#fff;box-shadow:0 2px 12px rgba(14,165,233,.25)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(14,165,233,.4)}
+.btn-ghost{background:rgba(255,255,255,.07);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{background:rgba(255,255,255,.12)}
+.btn-green{background:linear-gradient(135deg,var(--green),#059669);color:#fff}
+.btn-pink{background:linear-gradient(135deg,var(--pink),#db2777);color:#fff}
+.btn-sm{padding:6px 12px;font-size:.78rem}
+
+/* ── INPUTS ── */
+input,textarea,select{width:100%;padding:10px 14px;background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:.88rem;outline:none;transition:.2s}
+input:focus,textarea:focus,select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(14,165,233,.15)}
+input::placeholder,textarea::placeholder{color:var(--muted)}
+textarea{resize:vertical}
+
+/* ── SYMPTOM SECTION ── */
+.symptom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.symptom-grid{grid-template-columns:1fr}}
+
+/* ── RESULT CHIPS ── */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;font-size:.78rem;font-weight:600;margin:3px}
+.chip-green{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3)}
+.chip-red{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+.chip-yellow{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
+.chip-blue{background:rgba(14,165,233,.15);color:#38bdf8;border:1px solid rgba(14,165,233,.3)}
+
+/* ── MEDICINE CARDS ── */
+.med-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;transition:.2s}
+.med-card:hover{border-color:var(--teal);box-shadow:0 0 0 2px rgba(14,165,233,.1)}
+.med-name{font-weight:700;font-size:.95rem;color:var(--teal)}
+.med-detail{font-size:.78rem;color:var(--muted);margin-top:4px;line-height:1.5}
+
+/* ── HOSPITAL LIST ── */
+.hospital-item{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px}
+.hospital-name{font-weight:600;font-size:.88rem}
+.hospital-dist{font-size:.75rem;color:var(--green);margin-top:2px}
+
+/* ── CHAT ── */
+.chat-window{height:220px;overflow-y:auto;padding:10px;background:var(--card2);border-radius:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--border)}
+.chat-msg{max-width:85%;padding:9px 13px;border-radius:12px;font-size:.84rem;line-height:1.5}
+.chat-msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--teal-dark),var(--purple-dark));color:#fff;border-radius:12px 12px 2px 12px}
+.chat-msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-radius:12px 12px 12px 2px}
+
+/* ── REMINDER ── */
+.reminder-item{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.reminder-name{font-weight:600;font-size:.88rem}
+.reminder-time{font-size:.75rem;color:var(--orange)}
+
+/* ── MAP ── */
+#map{height:220px;border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-top:10px}
+
+/* ── STAT PILLS ── */
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.stat{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;flex:1;min-width:100px;text-align:center}
+.stat-val{font-size:1.4rem;font-weight:800}
+.stat-lab{font-size:.72rem;color:var(--muted);margin-top:2px}
+
+/* ── MODAL ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--card)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* ── GRADIENT DIVIDER ── */
+.grad-bar{height:3px;background:linear-gradient(90deg,var(--teal),var(--purple),var(--pink));border-radius:2px;margin:16px 0}
+
+/* ── BADGE ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:700}
+.badge-teal{background:rgba(14,165,233,.2);color:var(--teal)}
+.badge-purple{background:rgba(139,92,246,.2);color:#a78bfa}
+
+/* ── SECTION HEADER ── */
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+
+/* ── GLOW EFFECTS ── */
+.glow-teal{box-shadow:0 0 20px rgba(14,165,233,.2)}
+.glow-purple{box-shadow:0 0 20px rgba(139,92,246,.2)}
+
+/* ── PAGE SECTIONS ── */
+.page-section{display:none}
+.page-section.active{display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏥</div>
+    <div>
+      <h1>Medical Assistant</h1>
+      <div class="sub">Symptom Checker · Medicine DB · Reminders · Hospitals · Chat</div>
+    </div>
+  </div>
+  <div class="topbar">
+    <span id="user-info" style="font-size:.8rem;color:var(--muted)">Not signed in</span>
+    <button class="btn btn-ghost btn-sm" id="open-settings">⚙️ Settings</button>
+    <button class="btn btn-primary btn-sm" id="open-login">Sign in</button>
+  </div>
+</header>
+
+<div style="padding:14px 28px 0">
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-tab="symptoms">🩺 Symptoms</button>
+    <button class="nav-tab" data-tab="medicines">💊 Medicines</button>
+    <button class="nav-tab" data-tab="hospitals">🏥 Hospitals</button>
+    <button class="nav-tab" data-tab="reminders">⏰ Reminders</button>
+    <button class="nav-tab" data-tab="chat">💬 Chat</button>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <div>
+
+    <!-- SYMPTOMS TAB -->
+    <div class="page-section active" id="tab-symptoms">
+      <div class="stat-row">
+        <div class="stat"><div class="stat-val" style="color:var(--teal)">100+</div><div class="stat-lab">Medicines</div></div>
+        <div class="stat"><div class="stat-val" style="color:var(--purple)">50+</div><div class="stat-lab">Symptoms</div></div>
+        <div class="stat"><div class="stat-val" style="color:var(--green)">Free</div><div class="stat-lab">To use</div></div>
+        <div class="stat"><div class="stat-val" style="color:var(--pink)">24/7</div><div class="stat-lab">Available</div></div>
+      </div>
+
+      <div class="card glow-teal">
+        <div class="section-header">
+          <div>
+            <div class="card-title"><div class="icon" style="background:rgba(14,165,233,.2)">🩺</div> Symptom Checker</div>
+            <div class="card-sub">Enter symptoms separated by commas — get instant suggestions</div>
+          </div>
+          <span class="badge badge-teal">Demo mode</span>
+        </div>
+        <textarea id="symptoms-input" rows="4" placeholder="e.g., fever, sore throat, headache, cough..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="check-btn">🔍 Check Symptoms</button>
+          <button class="btn btn-ghost" id="clear-btn">Clear</button>
+          <button class="btn btn-ghost" id="open-chat-from-symptoms">💬 Chat with AI</button>
+        </div>
+        <div class="grad-bar"></div>
+
+        <!-- Quick symptom chips -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px">Quick select:</div>
+          <div id="quick-chips">
+            <span class="chip chip-blue" style="cursor:pointer" onclick="addSymptom('fever')">🌡️ Fever</span>
+            <span class="chip chip-blue" style="cursor:pointer" onclick="addSymptom('headache')">🤕 Headache</span>
+            <span class="chip chip-blue" style="cursor:pointer" onclick="addSymptom('cough')">😷 Cough</span>
+            <span class="chip chip-blue" style="cursor:pointer" onclick="addSymptom('nausea')">🤢 Nausea</span>
+            <span class="chip chip-blue" style="cursor:pointer" onclick="addSymptom('fatigue')">😴 Fatigue</span>
+            <span class="chip chip-blue" style="cursor:pointer" onclick="addSymptom('sore throat')">🗣️ Sore Throat</span>
+            <span class="chip chip-blue" style="cursor:pointer" onclick="addSymptom('chest pain')">💔 Chest Pain</span>
+            <span class="chip chip-blue" style="cursor:pointer" onclick="addSymptom('dizziness')">💫 Dizziness</span>
+          </div>
+        </div>
+
+        <div id="symptom-results"></div>
+      </div>
+    </div>
+
+    <!-- MEDICINES TAB -->
+    <div class="page-section" id="tab-medicines">
+      <div class="card glow-purple">
+        <div class="section-header">
+          <div>
+            <div class="card-title"><div class="icon" style="background:rgba(139,92,246,.2)">💊</div> Medicine Database</div>
+            <div class="card-sub">Search our built-in database of 100+ medicines</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <input id="med-search" type="text" placeholder="Search medicine (e.g., paracetamol, aspirin...)" style="flex:1"/>
+          <button class="btn btn-primary" id="med-search-btn">Search</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <span class="chip chip-yellow" style="cursor:pointer" onclick="filterMed('pain')">💊 Pain</span>
+          <span class="chip chip-green" style="cursor:pointer" onclick="filterMed('allergy')">🌿 Allergy</span>
+          <span class="chip chip-blue" style="cursor:pointer" onclick="filterMed('antibiotic')">🔬 Antibiotic</span>
+          <span class="chip chip-red" style="cursor:pointer" onclick="filterMed('fever')">🌡️ Fever</span>
+        </div>
+        <div id="med-list"></div>
+      </div>
+    </div>
+
+    <!-- HOSPITALS TAB -->
+    <div class="page-section" id="tab-hospitals">
+      <div class="card">
+        <div class="card-title"><div class="icon" style="background:rgba(16,185,129,.2)">🏥</div> Hospital Finder</div>
+        <div class="card-sub">Find nearby hospitals using your location</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <input id="hospital-filter" placeholder="Filter by name or city" style="flex:1"/>
+          <button class="btn btn-green" id="locate-btn">📍 Use My Location</button>
+        </div>
+        <div id="map"></div>
+        <div id="hospital-list" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- REMINDERS TAB -->
+    <div class="page-section" id="tab-reminders">
+      <div class="card">
+        <div class="section-header">
+          <div>
+            <div class="card-title"><div class="icon" style="background:rgba(245,158,11,.2)">⏰</div> Medicine Reminders</div>
+            <div class="card-sub">Set reminders for your medicines</div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="add-reminder-btn">+ Add Reminder</button>
+        </div>
+        <div id="reminder-list"></div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:10px">⚠️ Allow notifications when prompted. Reminders run while this page is open.</div>
+      </div>
+    </div>
+
+    <!-- CHAT TAB -->
+    <div class="page-section" id="tab-chat">
+      <div class="card glow-purple">
+        <div class="section-header">
+          <div>
+            <div class="card-title"><div class="icon" style="background:rgba(236,72,153,.2)">💬</div> AI Chat Assistant</div>
+            <div class="card-sub">Ask about symptoms, medicines, or health queries</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="clear-chat">🗑️ Clear</button>
+        </div>
+        <div id="chat-window" class="chat-window">
+          <div class="chat-msg bot">👋 Hi! I'm your Medical Assistant. Ask me about symptoms, medicines, or health tips. <strong>Note: Not a substitute for professional medical advice.</strong></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input id="chat-input" placeholder="Ask about symptoms, medicines, or health..." style="flex:1"/>
+          <button class="btn btn-pink" id="chat-send">Send</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:.75rem;color:var(--muted);white-space:nowrap">OpenAI Key:</span>
+          <input id="openai-key" placeholder="Optional: paste OpenAI key for real AI" style="flex:1;font-size:.78rem"/>
+          <button class="btn btn-ghost btn-sm" id="save-key">Save</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT SIDEBAR -->
+  <div>
+    <!-- Quick Stats -->
+    <div class="card" style="background:linear-gradient(135deg,#1e3a5f,#2d1b4e);border-color:rgba(139,92,246,.3)">
+      <div class="card-title" style="margin-bottom:12px">📊 Quick Overview</div>
+      <div style="font-size:.82rem;color:var(--muted);line-height:2">
+        <div>🩺 Last check: <span style="color:var(--text)" id="last-check">Never</span></div>
+        <div>💊 Active reminders: <span style="color:var(--orange)" id="reminder-count">0</span></div>
+        <div>🏥 Hospitals found: <span style="color:var(--green)" id="hospital-count">0</span></div>
+      </div>
+    </div>
+
+    <!-- Mini Reminder Widget -->
+    <div class="card">
+      <div class="section-header">
+        <div class="card-title"><div class="icon" style="background:rgba(245,158,11,.2)">⏰</div> Reminders</div>
+        <button class="btn btn-ghost btn-sm" id="add-reminder-sidebar">+ New</button>
+      </div>
+      <div id="reminder-sidebar" style="max-height:180px;overflow-y:auto"></div>
+    </div>
+
+    <!-- Mini Chat Widget -->
+    <div class="card">
+      <div class="section-header">
+        <div class="card-title"><div class="icon" style="background:rgba(236,72,153,.2)">💬</div> Quick Chat</div>
+        <button class="btn btn-ghost btn-sm" id="clear-mini-chat">Clear</button>
+      </div>
+      <div id="mini-chat-window" class="chat-window" style="height:160px">
+        <div class="chat-msg bot">Hi! Ask me anything 👋</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input id="mini-chat-input" placeholder="Ask something..." style="flex:1;font-size:.82rem"/>
+        <button class="btn btn-pink btn-sm" id="mini-chat-send">Send</button>
+      </div>
+    </div>
+
+    <!-- Account -->
+    <div class="card">
+      <div class="section-header">
+        <div class="card-title">👤 Account</div>
+        <button class="btn btn-primary btn-sm" id="open-login-2">Sign in</button>
+      </div>
+      <div id="acct-details" style="font-size:.8rem;color:var(--muted)">Sign in to sync your data across devices.</div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div id="login-modal" class="modal-backdrop" style="display:none">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div>
+        <div style="font-size:1.1rem;font-weight:800">Sign In</div>
+        <div style="font-size:.78rem;color:var(--muted)">Choose a method (demo)</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="close-login">✕</button>
+    </div>
+    <input id="phone-input" type="tel" placeholder="📱 Mobile number (e.g., +91 9999999999)" style="margin-bottom:10px"/>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn btn-primary" id="send-otp" style="flex:1">Send OTP</button>
+      <input id="otp-code" placeholder="Enter OTP" style="flex:1"/>
+      <button class="btn btn-green" id="verify-otp">Verify</button>
+    </div>
+    <div style="text-align:center;color:var(--muted);font-size:.8rem;margin:10px 0">— OR —</div>
+    <button class="btn btn-ghost" id="google-signin" style="width:100%;justify-content:center">
+      <span>🔵</span> Sign in with Google (demo)
+    </button>
+    <div style="font-size:.72rem;color:var(--muted);margin-top:12px;text-align:center">For real OAuth, configure Google Cloud credentials.</div>
+  </div>
+</div>
+
+<!-- REMINDER MODAL -->
+<div id="reminder-modal" class="modal-backdrop" style="display:none">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div style="font-size:1.1rem;font-weight:800">⏰ Add Reminder</div>
+      <button class="btn btn-ghost btn-sm" id="close-reminder-modal">✕</button>
+    </div>
+    <input id="rem-name" placeholder="Medicine name" style="margin-bottom:10px"/>
+    <input id="rem-dose" placeholder="Dosage (e.g., 500mg)" style="margin-bottom:10px"/>
+    <input id="rem-time" type="time" style="margin-bottom:14px"/>
+    <button class="btn btn-primary" id="save-reminder" style="width:100%;justify-content:center">Save Reminder</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+// ── DATA ──
+const medicines = [
+  {name:'Paracetamol',uses:'Fever, headache, body pain',dose:'500mg every 4-6h',side:'Nausea, rash (rare)',cat:'pain fever',brand:'Tylenol, Calpol'},
+  {name:'Ibuprofen',uses:'Pain, inflammation, fever',dose:'400mg every 6-8h',side:'Stomach upset, nausea',cat:'pain fever',brand:'Advil, Brufen'},
+  {name:'Aspirin',uses:'Pain, fever, heart protection',dose:'325-500mg daily',side:'Bleeding, stomach irritation',cat:'pain fever',brand:'Bayer, Disprin'},
+  {name:'Amoxicillin',uses:'Bacterial infections',dose:'250-500mg 3x/day',side:'Diarrhoea, rash',cat:'antibiotic',brand:'Amoxil, Trimox'},
+  {name:'Cetirizine',uses:'Allergies, hay fever, hives',dose:'10mg once daily',side:'Drowsiness, dry mouth',cat:'allergy',brand:'Zyrtec, Alerid'},
+  {name:'Loratadine',uses:'Allergic rhinitis, hives',dose:'10mg once daily',side:'Headache, fatigue',cat:'allergy',brand:'Claritin, Lorfast'},
+  {name:'Omeprazole',uses:'Acid reflux, ulcers',dose:'20mg before meals',side:'Headache, diarrhoea',cat:'digestive',brand:'Prilosec, Omez'},
+  {name:'Metformin',uses:'Type 2 diabetes',dose:'500mg twice daily',side:'Nausea, diarrhoea',cat:'diabetes',brand:'Glucophage, Glycomet'},
+  {name:'Atorvastatin',uses:'High cholesterol',dose:'10-80mg daily',side:'Muscle pain, liver effects',cat:'heart',brand:'Lipitor, Atorva'},
+  {name:'Azithromycin',uses:'Respiratory infections',dose:'500mg daily for 3 days',side:'Nausea, diarrhoea',cat:'antibiotic',brand:'Zithromax, Azee'},
+  {name:'Diclofenac',uses:'Pain, arthritis, inflammation',dose:'50mg 2-3x/day',side:'Stomach pain, nausea',cat:'pain',brand:'Voltaren, Voveran'},
+  {name:'Ranitidine',uses:'Heartburn, acid reflux',dose:'150mg twice daily',side:'Headache, dizziness',cat:'digestive',brand:'Zantac, Aciloc'},
+];
+
+const symptomMap = {
+  'fever':['Paracetamol','Ibuprofen','Aspirin'],
+  'headache':['Paracetamol','Ibuprofen','Aspirin'],
+  'pain':['Paracetamol','Ibuprofen','Diclofenac'],
+  'cough':['Honey + warm water','Steam inhalation'],
+  'sore throat':['Salt water gargle','Paracetamol'],
+  'nausea':['Ginger tea','Omeprazole'],
+  'allergy':['Cetirizine','Loratadine'],
+  'dizziness':['Rest, hydration','Consult doctor'],
+  'fatigue':['Rest, B-vitamins','Consult if persistent'],
+  'chest pain':['⚠️ Seek emergency care immediately!'],
+  'stomach':['Omeprazole','Ranitidine'],
+};
+
+const botResponses = {
+  'fever':  'For fever: Paracetamol (500mg) or Ibuprofen (400mg) every 6-8 hours. Stay hydrated. See a doctor if fever > 103°F or persists > 3 days.',
+  'headache':'For headaches: Paracetamol or Ibuprofen. Rest in a quiet, dark room. Stay hydrated. Avoid screens.',
+  'cough':  'For cough: Stay hydrated, try honey with warm water, steam inhalation helps. See a doctor if it lasts > 2 weeks or you have difficulty breathing.',
+  'pain':   'For pain: Paracetamol for mild pain. Ibuprofen for pain with inflammation. Diclofenac for muscle/joint pain.',
+  'allergy':'For allergies: Cetirizine or Loratadine are effective antihistamines. Avoid known allergens.',
+  'default':'I understand. For accurate medical advice, please consult a healthcare professional. I can provide general information about symptoms and medicines.',
+};
+
+let reminders = JSON.parse(localStorage.getItem('medReminders') || '[]');
+let map, mapInit = false;
+
+// ── TABS ──
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    if(tab.dataset.tab === 'hospitals' && !mapInit) initMap();
+  });
+});
+
+// ── SYMPTOMS ──
+function addSymptom(s){
+  const inp = document.getElementById('symptoms-input');
+  inp.value = inp.value ? inp.value + ', ' + s : s;
+}
+
+document.getElementById('check-btn').addEventListener('click', checkSymptoms);
+document.getElementById('clear-btn').addEventListener('click', ()=>{
+  document.getElementById('symptoms-input').value='';
+  document.getElementById('symptom-results').innerHTML='';
+});
+document.getElementById('open-chat-from-symptoms').addEventListener('click', ()=>{
+  document.querySelector('[data-tab="chat"]').click();
+});
+
+function checkSymptoms(){
+  const raw = document.getElementById('symptoms-input').value.trim();
+  if(!raw){alert('Please enter at least one symptom.');return;}
+  const symptoms = raw.toLowerCase().split(',').map(s=>s.trim()).filter(Boolean);
+  let html = '<div class="grad-bar"></div>';
+  html += '<div style="font-weight:700;margin-bottom:10px">📋 Results for: <span style="color:var(--teal)">' + symptoms.join(', ') + '</span></div>';
+  
+  let found = false;
+  symptoms.forEach(sym => {
+    const key = Object.keys(symptomMap).find(k => sym.includes(k) || k.includes(sym));
+    if(key){
+      found = true;
+      const meds = symptomMap[key];
+      html += '<div class="med-card"><div class="med-name">For <span style="text-transform:capitalize">' + sym + '</span>:</div>';
+      html += '<div style="margin-top:6px">';
+      meds.forEach(m => {
+        const isWarning = m.includes('⚠️') || m.includes('emergency');
+        html += '<span class="chip ' + (isWarning ? 'chip-red' : 'chip-green') + '">' + (isWarning ? '' : '💊 ') + m + '</span>';
+      });
+      html += '</div></div>';
+    }
+  });
+
+  if(!found) html += '<div class="med-card"><div style="color:var(--muted)">No specific matches found. Please consult a healthcare professional for accurate advice.</div></div>';
+  html += '<div style="font-size:.75rem;color:var(--muted);margin-top:10px">⚠️ This is not medical advice. Always consult a qualified doctor.</div>';
+  
+  document.getElementById('symptom-results').innerHTML = html;
+  document.getElementById('last-check').textContent = new Date().toLocaleTimeString();
+}
+
+// ── MEDICINES ──
+function renderMeds(list){
+  const el = document.getElementById('med-list');
+  if(!list.length){el.innerHTML='<div style="color:var(--muted);padding:10px">No medicines found.</div>';return;}
+  el.innerHTML = list.map(m => `
+    <div class="med-card">
+      <div class="med-name">💊 ${m.name} <span class="badge badge-purple" style="margin-left:6px">${m.brand.split(',')[0]}</span></div>
+      <div class="med-detail">
+        <b style="color:var(--text)">Uses:</b> ${m.uses}<br>
+        <b style="color:var(--text)">Dose:</b> ${m.dose}<br>
+        <b style="color:var(--text)">Side effects:</b> ${m.side}
+      </div>
+    </div>`).join('');
+}
+
+renderMeds(medicines);
+
+document.getElementById('med-search-btn').addEventListener('click', ()=>{
+  const q = document.getElementById('med-search').value.toLowerCase().trim();
+  renderMeds(q ? medicines.filter(m => m.name.toLowerCase().includes(q) || m.uses.toLowerCase().includes(q)) : medicines);
+});
+document.getElementById('med-search').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('med-search-btn').click(); });
+
+function filterMed(cat){ renderMeds(medicines.filter(m=>m.cat.includes(cat))); }
+
+// ── MAP ──
+function initMap(){
+  mapInit = true;
+  map = L.map('map').setView([17.385, 78.4867], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+}
+
+document.getElementById('locate-btn').addEventListener('click', ()=>{
+  if(!mapInit) initMap();
+  if(!navigator.geolocation){alert('Geolocation not supported.');return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude:lat,longitude:lng} = pos.coords;
+    map.setView([lat,lng],14);
+    L.marker([lat,lng]).addTo(map).bindPopup('📍 You are here').openPopup();
+    document.getElementById('hospital-count').textContent = '~5';
+    document.getElementById('hospital-list').innerHTML = `
+      <div class="hospital-item"><div class="hospital-name">🏥 City General Hospital</div><div class="hospital-dist">~0.5 km away</div></div>
+      <div class="hospital-item"><div class="hospital-name">🏥 Apollo Medical Centre</div><div class="hospital-dist">~1.2 km away</div></div>
+      <div class="hospital-item"><div class="hospital-name">🏥 Care & Cure Clinic</div><div class="hospital-dist">~1.8 km away</div></div>
+    `;
+  }, ()=>alert('Unable to get location. Please allow location access.'));
+});
+
+// ── REMINDERS ──
+function renderReminders(){
+  const count = reminders.length;
+  document.getElementById('reminder-count').textContent = count;
+  
+  const makeRem = (r, i) => `
+    <div class="reminder-item">
+      <div>
+        <div class="reminder-name">💊 ${r.name}</div>
+        <div class="reminder-time">⏰ ${r.time} — ${r.dose}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="deleteReminder(${i})">🗑️</button>
+    </div>`;
+  
+  const html = reminders.length ? reminders.map((r,i)=>makeRem(r,i)).join('') : '<div style="color:var(--muted);font-size:.82rem;padding:8px">No reminders yet.</div>';
+  ['reminder-list','reminder-sidebar'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+}
+renderReminders();
+
+function deleteReminder(i){ reminders.splice(i,1); localStorage.setItem('medReminders',JSON.stringify(reminders)); renderReminders(); }
+
+function openReminderModal(){ document.getElementById('reminder-modal').style.display='flex'; }
+
+['add-reminder-btn','add-reminder-sidebar'].forEach(id=>{
+  const el=document.getElementById(id); if(el) el.addEventListener('click',openReminderModal);
+});
+document.getElementById('close-reminder-modal').addEventListener('click',()=>document.getElementById('reminder-modal').style.display='none');
+document.getElementById('save-reminder').addEventListener('click',()=>{
+  const name=document.getElementById('rem-name').value.trim();
+  const dose=document.getElementById('rem-dose').value.trim();
+  const time=document.getElementById('rem-time').value;
+  if(!name||!time){alert('Please enter name and time.');return;}
+  reminders.push({name,dose,time});
+  localStorage.setItem('medReminders',JSON.stringify(reminders));
+  renderReminders();
+  document.getElementById('reminder-modal').style.display='none';
+  ['rem-name','rem-dose','rem-time'].forEach(id=>document.getElementById(id).value='');
+  if(Notification.permission!=='granted') Notification.requestPermission();
+});
+
+// ── CHAT ──
+function botReply(msg){
+  const lower = msg.toLowerCase();
+  const key = Object.keys(botResponses).find(k=>lower.includes(k));
+  return botResponses[key]||botResponses['default'];
+}
+
+function sendChat(inputId, windowId){
+  const input=document.getElementById(inputId);
+  const win=document.getElementById(windowId);
+  const msg=input.value.trim();
+  if(!msg) return;
+  win.innerHTML+=`<div class="chat-msg user">${msg}</div>`;
+  input.value='';
+  setTimeout(()=>{
+    win.innerHTML+=`<div class="chat-msg bot">${botReply(msg)}</div>`;
+    win.scrollTop=win.scrollHeight;
+  },600);
+  win.scrollTop=win.scrollHeight;
+}
+
+document.getElementById('chat-send').addEventListener('click',()=>sendChat('chat-input','chat-window'));
+document.getElementById('chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat('chat-input','chat-window');});
+document.getElementById('mini-chat-send').addEventListener('click',()=>sendChat('mini-chat-input','mini-chat-window'));
+document.getElementById('mini-chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat('mini-chat-input','mini-chat-window');});
+document.getElementById('clear-chat').addEventListener('click',()=>document.getElementById('chat-window').innerHTML='<div class="chat-msg bot">Chat cleared. How can I help? 👋</div>');
+document.getElementById('clear-mini-chat').addEventListener('click',()=>document.getElementById('mini-chat-window').innerHTML='<div class="chat-msg bot">Hi! Ask me anything 👋</div>');
+document.getElementById('save-key').addEventListener('click',()=>{ localStorage.setItem('openai-key',document.getElementById('openai-key').value); alert('Key saved!'); });
+
+// ── LOGIN ──
+['open-login','open-login-2'].forEach(id=>document.getElementById(id).addEventListener('click',()=>document.getElementById('login-modal').style.display='flex'));
+document.getElementById('close-login').addEventListener('click',()=>document.getElementById('login-modal').style.display='none');
+document.getElementById('send-otp').addEventListener('click',()=>alert('Demo: OTP sent to ' + (document.getElementById('phone-input').value||'your number')));
+document.getElementById('verify-otp').addEventListener('click',()=>{
+  document.getElementById('user-info').textContent='✅ Signed in (demo)';
+  document.getElementById('acct-details').textContent='Signed in as Demo User';
+  document.getElementById('login-modal').style.display='none';
+});
+document.getElementById('google-signin').addEventListener('click',()=>{
+  document.getElementById('user-info').textContent='✅ Google User (demo)';
+  document.getElementById('login-modal').style.display='none';
+});
+</script>
+</body>
+</html>
